@@ -1,0 +1,625 @@
+{% extends "base.html" %}
+{% block title %}{{ file_info.original_name }} · Insalud{% endblock %}
+{% block page_title %}Visor de Datos{% endblock %}
+
+{% block content %}
+<!-- File info bar -->
+<div class="viewer-topbar">
+  <a href="{{ url_for('files') }}" class="back-btn">
+    <i class="fas fa-arrow-left"></i> Volver
+  </a>
+  <div class="viewer-file-info">
+    <div class="viewer-file-icon {{ file_info.file_type|lower }}">
+      <i class="fas fa-file-excel"></i>
+    </div>
+    <div>
+      <div class="viewer-file-name">{{ file_info.original_name }}</div>
+      <div class="viewer-file-meta">
+        {{ file_info.file_type }} ·
+        {{ (file_info.file_size / 1024)|round(1) }} KB ·
+        {{ file_info.sheet_count }} hoja(s) ·
+        Subido el {{ file_info.uploaded_at.strftime('%d/%m/%Y') }}
+      </div>
+    </div>
+  </div>
+  <a href="{{ url_for('download_file', file_id=file_info.id) }}" class="btn-primary">
+    <i class="fas fa-download"></i> Descargar
+  </a>
+</div>
+
+<!-- Sheet tabs -->
+{% if sheets|length > 1 %}
+<div class="sheet-tabs" id="sheetTabs">
+  {% for sheet in sheets %}
+  <button class="sheet-tab {% if loop.first %}active{% endif %}"
+          onclick="loadSheet('{{ file_info.id }}', '{{ sheet.sheet_name }}', this)"
+          data-sheet="{{ sheet.sheet_name }}">
+    <i class="fas fa-table"></i>
+    {{ sheet.sheet_name }}
+    <span class="tab-rows">{{ '{:,}'.format(sheet.total_rows) }} filas</span>
+  </button>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Data viewer -->
+<div class="viewer-card">
+  <!-- Toolbar -->
+  <div class="viewer-toolbar">
+    <div class="viewer-search">
+      <i class="fas fa-magnifying-glass"></i>
+      <input type="text" id="tableSearch" placeholder="Buscar en los datos..."
+             oninput="debounceSearch(this.value)">
+    </div>
+    <div class="viewer-info">
+      <span id="rowInfo">Cargando...</span>
+    </div>
+    <div class="viewer-controls" style="display:flex;gap:.6rem;align-items:center">
+      <button id="btnFillCatalog" onclick="openFillModal()"
+              style="padding:.5rem 1rem;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:.82rem;display:flex;align-items:center;gap:.45rem">
+        <i class="fas fa-wand-magic-sparkles"></i> Rellenar con catálogo
+      </button>
+      <select id="perPageSelect" onchange="changePerPage(this.value)" class="filter-select">
+        <option value="25">25 por página</option>
+        <option value="50" selected>50 por página</option>
+        <option value="100">100 por página</option>
+        <option value="250">250 por página</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Table container -->
+  <div class="table-scroll-wrap" id="tableWrap">
+    <div class="loading-state" id="loadingState">
+      <i class="fas fa-circle-notch fa-spin"></i>
+      <span>Cargando datos...</span>
+    </div>
+    <table class="excel-table" id="excelTable" style="display:none">
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Table pagination -->
+  <div class="table-footer">
+    <div class="table-pag" id="tablePag"></div>
+  </div>
+</div>
+
+<!-- ══ MODAL: Rellenar con catálogo ══════════════════════════════════ -->
+<div id="fillModal" style="display:none;position:fixed;inset:0;background:#00000088;z-index:999;display:none;align-items:center;justify-content:center">
+  <div style="background:var(--card-bg,#111);border:1px solid var(--border,#333);border-radius:20px;width:min(680px,95vw);max-height:90vh;overflow-y:auto;padding:2rem;box-shadow:0 24px 80px #00000088">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem">
+      <h3 style="margin:0;font-size:1.1rem"><i class="fas fa-wand-magic-sparkles" style="color:#7c3aed"></i> Rellenar con Catálogo Geográfico</h3>
+      <button onclick="closeFillModal()" style="background:none;border:none;color:var(--text-muted,#888);font-size:1.3rem;cursor:pointer"><i class="fas fa-xmark"></i></button>
+    </div>
+
+    <!-- Paso 1: valores -->
+    <div style="background:var(--hover-bg,#ffffff08);border-radius:12px;padding:1.1rem;margin-bottom:1rem">
+      <p style="margin:0 0 .75rem;font-size:.8rem;font-weight:700;color:var(--text-muted,#888);text-transform:uppercase;letter-spacing:.06em">1 · Seleccionar valores</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem">
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:var(--text-muted,#888);display:block;margin-bottom:.3rem">Estado</label>
+          <select id="fill-estado" onchange="fillLoadMun()" style="width:100%;padding:.55rem .8rem;background:var(--input-bg,#0d0d0d);border:1px solid var(--border,#333);border-radius:8px;color:var(--text,#fff);font-size:.85rem">
+            <option value="">-- No aplicar --</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:var(--text-muted,#888);display:block;margin-bottom:.3rem">Municipio</label>
+          <select id="fill-municipio" onchange="fillLoadParr()" style="width:100%;padding:.55rem .8rem;background:var(--input-bg,#0d0d0d);border:1px solid var(--border,#333);border-radius:8px;color:var(--text,#fff);font-size:.85rem">
+            <option value="">-- No aplicar --</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:var(--text-muted,#888);display:block;margin-bottom:.3rem">Parroquia</label>
+          <select id="fill-parroquia" onchange="fillLoadAsic()" style="width:100%;padding:.55rem .8rem;background:var(--input-bg,#0d0d0d);border:1px solid var(--border,#333);border-radius:8px;color:var(--text,#fff);font-size:.85rem">
+            <option value="">-- No aplicar --</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.78rem;font-weight:600;color:var(--text-muted,#888);display:block;margin-bottom:.3rem">ASIC</label>
+          <select id="fill-asic" style="width:100%;padding:.55rem .8rem;background:var(--input-bg,#0d0d0d);border:1px solid var(--border,#333);border-radius:8px;color:var(--text,#fff);font-size:.85rem">
+            <option value="">-- No aplicar --</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Paso 2: mapeo columnas -->
+    <div style="background:var(--hover-bg,#ffffff08);border-radius:12px;padding:1.1rem;margin-bottom:1rem">
+      <p style="margin:0 0 .75rem;font-size:.8rem;font-weight:700;color:var(--text-muted,#888);text-transform:uppercase;letter-spacing:.06em">2 · Mapear a columnas del archivo</p>
+      <div id="fill-mappings" style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem">
+        <p style="color:var(--text-muted,#888);font-size:.85rem;grid-column:1/-1">Cargando columnas...</p>
+      </div>
+    </div>
+
+    <!-- Paso 3: rango -->
+    <div style="background:var(--hover-bg,#ffffff08);border-radius:12px;padding:1.1rem;margin-bottom:1.5rem">
+      <p style="margin:0 0 .75rem;font-size:.8rem;font-weight:700;color:var(--text-muted,#888);text-transform:uppercase;letter-spacing:.06em">3 · Rango de filas</p>
+      <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.88rem">
+          <input type="radio" name="fillRange" value="all" checked onchange="toggleRangeInputs()"> Todas las filas
+        </label>
+        <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.88rem">
+          <input type="radio" name="fillRange" value="range" onchange="toggleRangeInputs()"> Rango específico
+        </label>
+        <div id="rangeInputs" style="display:none;display:flex;gap:.5rem;align-items:center">
+          <input type="number" id="fill-from" placeholder="Desde (fila 1)" min="1"
+                 style="width:130px;padding:.45rem .7rem;background:var(--input-bg,#0d0d0d);border:1px solid var(--border,#333);border-radius:8px;color:var(--text,#fff);font-size:.85rem">
+          <span style="color:var(--text-muted,#888)">–</span>
+          <input type="number" id="fill-to" placeholder="Hasta"
+                 style="width:100px;padding:.45rem .7rem;background:var(--input-bg,#0d0d0d);border:1px solid var(--border,#333);border-radius:8px;color:var(--text,#fff);font-size:.85rem">
+        </div>
+      </div>
+    </div>
+
+    <!-- Acciones -->
+    <div style="display:flex;gap:.75rem;justify-content:flex-end">
+      <button onclick="closeFillModal()" style="padding:.65rem 1.4rem;border:1px solid var(--border,#333);background:none;color:var(--text,#fff);border-radius:8px;cursor:pointer;font-weight:600">Cancelar</button>
+      <button onclick="applyFill()" id="btnApplyFill"
+              style="padding:.65rem 1.6rem;background:linear-gradient(135deg,#7c3aed,#4f46e5);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:.5rem">
+        <i class="fas fa-wand-magic-sparkles"></i> Aplicar
+      </button>
+    </div>
+
+    <div id="fillResult" style="display:none;margin-top:1rem;padding:.75rem 1rem;border-radius:8px;font-size:.88rem;font-weight:600"></div>
+  </div>
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+const FILE_ID = {{ file_info.id }};
+let currentSheet = '{{ sheets[0].sheet_name if sheets else "" }}';
+let currentPage = 1;
+let currentPerPage = 50;
+let currentSearch = '';
+let searchTimeout;
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (currentSheet) loadSheet(FILE_ID, currentSheet, document.querySelector('.sheet-tab'));
+});
+
+function loadSheet(fileId, sheetName, tabEl) {
+  currentSheet = sheetName;
+  currentPage = 1;
+  currentSearch = '';
+  document.getElementById('tableSearch').value = '';
+  document.querySelectorAll('.sheet-tab').forEach(t => t.classList.remove('active'));
+  if (tabEl) tabEl.classList.add('active');
+  fetchData();
+}
+
+function fetchData() {
+  const url = `/api/sheet-data/${FILE_ID}/${encodeURIComponent(currentSheet)}?page=${currentPage}&per_page=${currentPerPage}&search=${encodeURIComponent(currentSearch)}`;
+  document.getElementById('loadingState').style.display = 'flex';
+  document.getElementById('excelTable').style.display = 'none';
+  document.getElementById('rowInfo').textContent = 'Cargando...';
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { showError(data.error); return; }
+      renderTable(data);
+    })
+    .catch(err => showError('Error de conexión: ' + err));
+}
+
+function renderTable(data) {
+  const typeIcon = {
+    date:    { icon: 'fa-calendar-days',  label: 'Fecha',    cls: 'type-date'    },
+    integer: { icon: 'fa-hashtag',        label: 'Entero',   cls: 'type-int'     },
+    float:   { icon: 'fa-arrow-up-9-1',   label: 'Decimal',  cls: 'type-float'   },
+    boolean: { icon: 'fa-toggle-on',      label: 'Lógico',   cls: 'type-bool'    },
+    text:    { icon: 'fa-font',           label: 'Texto',    cls: 'type-text'    },
+  };
+  const types = data.col_types || data.columns.map(() => 'text');
+
+  // Header
+  const thead = document.getElementById('tableHead');
+  thead.innerHTML = '<tr><th class="row-num">#</th>' +
+    data.columns.map((c, i) => {
+      const t = typeIcon[types[i]] || typeIcon.text;
+      return `<th class="${t.cls}" title="${t.label}">
+        <div class="th-inner">
+          <i class="fas ${t.icon} th-type-icon"></i>
+          <span>${escHtml(String(c))}</span>
+        </div>
+      </th>`;
+    }).join('') + '</tr>';
+
+  // Body
+  const tbody = document.getElementById('tableBody');
+  const startIdx = (data.page - 1) * data.per_page;
+  if (!data.data.length) {
+    tbody.innerHTML = `<tr><td colspan="${data.columns.length + 1}" class="empty-cell">Sin resultados</td></tr>`;
+  } else {
+    tbody.innerHTML = data.data.map((row, i) =>
+      `<tr><td class="row-num">${startIdx + i + 1}</td>` +
+      row.map((cell, j) => {
+        const t = types[j];
+        let cls = '';
+        let display = escHtml(String(cell));
+        if (t === 'integer' || t === 'float') cls = 'cell-num';
+        if (t === 'date') cls = 'cell-date';
+        if (t === 'boolean') display = cell === 'Sí'
+          ? '<span class="bool-yes">✓ Sí</span>'
+          : (cell === 'No' ? '<span class="bool-no">✗ No</span>' : escHtml(String(cell)));
+        const colNameEsc = data.columns[j].replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        return `<td class="${cls}" ondblclick="editCell(this, ${startIdx + i}, '${colNameEsc}', '${t}')" title="Doble clic para editar">${display}</td>`;
+      }).join('') +
+      '</tr>'
+    ).join('');
+  }
+
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('excelTable').style.display = 'table';
+
+  // Info
+  const start = startIdx + 1;
+  const end = Math.min(startIdx + data.per_page, data.total_rows);
+  document.getElementById('rowInfo').textContent =
+    `Mostrando ${start}–${end} de ${data.total_rows.toLocaleString()} filas`;
+
+  // Pagination
+  renderPag(data.page, data.total_pages, data.total_rows);
+}
+
+function renderPag(page, totalPages, totalRows) {
+  const pag = document.getElementById('tablePag');
+  if (totalPages <= 1) { pag.innerHTML = ''; return; }
+  let html = '';
+  if (page > 1) html += `<button class="page-btn" onclick="goPage(${page-1})"><i class="fas fa-chevron-left"></i></button>`;
+
+  const range = [];
+  for (let p = 1; p <= totalPages; p++) {
+    if (p <= 2 || p >= totalPages-1 || Math.abs(p - page) <= 2) range.push(p);
+  }
+  let last = 0;
+  range.forEach(p => {
+    if (last && p - last > 1) html += `<span class="page-ellipsis">…</span>`;
+    html += `<button class="page-btn ${p===page?'page-active':''}" onclick="goPage(${p})">${p}</button>`;
+    last = p;
+  });
+  if (page < totalPages) html += `<button class="page-btn" onclick="goPage(${page+1})"><i class="fas fa-chevron-right"></i></button>`;
+  pag.innerHTML = html;
+}
+
+function goPage(p) { currentPage = p; fetchData(); }
+function changePerPage(v) { currentPerPage = parseInt(v); currentPage = 1; fetchData(); }
+function debounceSearch(v) {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => { currentSearch = v; currentPage = 1; fetchData(); }, 400);
+}
+function showError(msg) {
+  document.getElementById('loadingState').innerHTML =
+    `<i class="fas fa-triangle-exclamation"></i><span>${msg}</span>`;
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ══ CATÁLOGO GEOGRÁFICO — Modal lógica ══════════════════════════════
+
+let _lastColumns = [];   // columnas del archivo actual
+
+function openFillModal() {
+  const modal = document.getElementById('fillModal');
+  modal.style.display = 'flex';
+  _buildMappingRows(_lastColumns);
+  _loadFillEstados();
+}
+
+function closeFillModal() {
+  document.getElementById('fillModal').style.display = 'none';
+  const res = document.getElementById('fillResult');
+  res.style.display = 'none';
+}
+
+// Guardar columnas cada vez que se renderiza la tabla
+const _origRenderTable = renderTable;
+// (patch after definition — see bottom)
+
+async function _loadFillEstados() {
+  const sel = document.getElementById('fill-estado');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">-- No aplicar --</option>';
+  const data = await fetch('/api/geo/estados').then(r => r.json());
+  data.forEach(e => {
+    const o = document.createElement('option');
+    o.value = e.nombre; o.textContent = e.nombre;
+    sel.appendChild(o);
+  });
+  if (current) sel.value = current;
+  await fillLoadMun();
+}
+
+async function fillLoadMun() {
+  const estadoNombre = document.getElementById('fill-estado').value;
+  const selMun = document.getElementById('fill-municipio');
+  const selParr = document.getElementById('fill-parroquia');
+  const selAsic = document.getElementById('fill-asic');
+  selMun.innerHTML = '<option value="">-- No aplicar --</option>';
+  selParr.innerHTML = '<option value="">-- No aplicar --</option>';
+  selAsic.innerHTML = '<option value="">-- No aplicar --</option>';
+  if (!estadoNombre) return;
+  const estados = await fetch('/api/geo/estados').then(r => r.json());
+  const est = estados.find(e => e.nombre === estadoNombre);
+  if (!est) return;
+  const muns = await fetch('/api/geo/municipios?estado_id=' + est.id).then(r => r.json());
+  muns.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.nombre; o.textContent = m.nombre;
+    selMun.appendChild(o);
+  });
+}
+
+async function fillLoadParr() {
+  const munNombre = document.getElementById('fill-municipio').value;
+  const selParr = document.getElementById('fill-parroquia');
+  const selAsic = document.getElementById('fill-asic');
+  selParr.innerHTML = '<option value="">-- No aplicar --</option>';
+  selAsic.innerHTML = '<option value="">-- No aplicar --</option>';
+  if (!munNombre) return;
+  const muns = await fetch('/api/geo/municipios').then(r => r.json());
+  const mun = muns.find(m => m.nombre === munNombre);
+  if (!mun) return;
+  const parrs = await fetch('/api/geo/parroquias?municipio_id=' + mun.id).then(r => r.json());
+  parrs.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.nombre; o.textContent = p.nombre;
+    selParr.appendChild(o);
+  });
+}
+
+async function fillLoadAsic() {
+  const parrNombre = document.getElementById('fill-parroquia').value;
+  const selAsic = document.getElementById('fill-asic');
+  selAsic.innerHTML = '<option value="">-- No aplicar --</option>';
+  if (!parrNombre) {
+    const all = await fetch('/api/geo/asics').then(r => r.json());
+    all.forEach(a => { const o=document.createElement('option'); o.value=a.nombre; o.textContent=a.nombre; selAsic.appendChild(o); });
+    return;
+  }
+  const parrs = await fetch('/api/geo/parroquias').then(r => r.json());
+  const parr = parrs.find(p => p.nombre === parrNombre);
+  if (!parr) return;
+  const asics = await fetch('/api/geo/asics?parroquia_id=' + parr.id).then(r => r.json());
+  asics.forEach(a => { const o=document.createElement('option'); o.value=a.nombre; o.textContent=a.nombre; selAsic.appendChild(o); });
+}
+
+function _buildMappingRows(columns) {
+  const container = document.getElementById('fill-mappings');
+  if (!columns.length) {
+    container.innerHTML = '<p style="color:var(--text-muted,#888);font-size:.85rem;grid-column:1/-1">Cargando columnas...</p>';
+    return;
+  }
+  const fields = [
+    { key: 'estado',    label: 'Estado',    icon: 'fa-map',      color: '#3b82f6' },
+    { key: 'municipio', label: 'Municipio', icon: 'fa-city',     color: '#22c55e' },
+    { key: 'parroquia', label: 'Parroquia', icon: 'fa-church',   color: '#a855f7' },
+    { key: 'asic',      label: 'ASIC',      icon: 'fa-hospital', color: '#f97316' },
+  ];
+  const opts = columns.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  container.innerHTML = fields.map(f => `
+    <div>
+      <label style="font-size:.78rem;font-weight:600;color:var(--text-muted,#888);display:block;margin-bottom:.3rem">
+        <i class="fas ${f.icon}" style="color:${f.color}"></i> ${f.label} → columna
+      </label>
+      <select id="map-${f.key}" style="width:100%;padding:.52rem .8rem;background:var(--input-bg,#0d0d0d);border:1px solid var(--border,#333);border-radius:8px;color:var(--text,#fff);font-size:.84rem">
+        <option value="">-- No mapear --</option>
+        ${opts}
+      </select>
+    </div>`).join('');
+  // Auto-detect common column names
+  const hints = {
+    estado:['estado','entidad','entidad federal'], municipio:['municipio','mun'],
+    parroquia:['parroquia','parr'], asic:['asic','ambulatorio','cdii']
+  };
+  fields.forEach(f => {
+    const sel = document.getElementById('map-' + f.key);
+    columns.forEach(c => {
+      if (hints[f.key].some(h => c.toLowerCase().includes(h))) sel.value = c;
+    });
+  });
+}
+
+function toggleRangeInputs() {
+  const v = document.querySelector('input[name="fillRange"]:checked').value;
+  document.getElementById('rangeInputs').style.display = v === 'range' ? 'flex' : 'none';
+}
+
+async function applyFill() {
+  const btn = document.getElementById('btnApplyFill');
+  const res = document.getElementById('fillResult');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Aplicando...';
+
+  const mappings = {};
+  const fields = ['estado','municipio','parroquia','asic'];
+  fields.forEach(f => {
+    const colSel = document.getElementById('map-' + f);
+    const valSel = document.getElementById('fill-' + f);
+    if (colSel?.value && valSel?.value) mappings[colSel.value] = valSel.value;
+  });
+
+  if (!Object.keys(mappings).length) {
+    res.style.display = 'block';
+    res.style.background = '#ef444420'; res.style.color = '#ef4444';
+    res.textContent = '⚠ Seleccione al menos un campo y su columna correspondiente.';
+    btn.disabled = false; btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Aplicar';
+    return;
+  }
+
+  const rangeType = document.querySelector('input[name="fillRange"]:checked').value;
+  let rowFrom = 0, rowTo = null;
+  if (rangeType === 'range') {
+    rowFrom = (parseInt(document.getElementById('fill-from').value) || 1) - 1;
+    const toVal = document.getElementById('fill-to').value;
+    rowTo = toVal ? parseInt(toVal) : null;
+  }
+
+  try {
+    const r = await fetch(`/api/fill-columns/${FILE_ID}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ sheet_name: currentSheet, mappings, row_from: rowFrom, row_to: rowTo })
+    });
+    const data = await r.json();
+    res.style.display = 'block';
+    if (data.error) {
+      res.style.background = '#ef444420'; res.style.color = '#ef4444';
+      res.textContent = '❌ Error: ' + data.error;
+    } else {
+      res.style.background = '#22c55e20'; res.style.color = '#22c55e';
+      res.textContent = `✅ ${data.rows_updated} fila(s) actualizadas correctamente. Recargando...`;
+      setTimeout(() => { closeFillModal(); fetchData(); }, 1500);
+    }
+  } catch(e) {
+    res.style.display = 'block';
+    res.style.background = '#ef444420'; res.style.color = '#ef4444';
+    res.textContent = '❌ Error de conexión: ' + e;
+  }
+  btn.disabled = false; btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Aplicar';
+}
+
+// Patch renderTable to capture column names for the modal
+function renderTable(data) {
+  _lastColumns = data.columns || [];
+  const typeIcon = {
+    date:    { icon: 'fa-calendar-days',  label: 'Fecha',    cls: 'type-date'    },
+    integer: { icon: 'fa-hashtag',        label: 'Entero',   cls: 'type-int'     },
+    float:   { icon: 'fa-arrow-up-9-1',   label: 'Decimal',  cls: 'type-float'   },
+    boolean: { icon: 'fa-toggle-on',      label: 'Lógico',   cls: 'type-bool'    },
+    text:    { icon: 'fa-font',           label: 'Texto',    cls: 'type-text'    },
+  };
+  const types = data.col_types || data.columns.map(() => 'text');
+
+  const thead = document.getElementById('tableHead');
+  thead.innerHTML = '<tr><th class="row-num">#</th>' +
+    data.columns.map((c, i) => {
+      const t = typeIcon[types[i]] || typeIcon.text;
+      return `<th class="${t.cls}" title="${t.label}">
+        <div class="th-inner">
+          <i class="fas ${t.icon} th-type-icon"></i>
+          <span>${escHtml(String(c))}</span>
+        </div>
+      </th>`;
+    }).join('') + '</tr>';
+
+  const tbody = document.getElementById('tableBody');
+  const startIdx = (data.page - 1) * data.per_page;
+  if (!data.data.length) {
+    tbody.innerHTML = `<tr><td colspan="${data.columns.length + 1}" class="empty-cell">Sin resultados</td></tr>`;
+  } else {
+    tbody.innerHTML = data.data.map((row, i) =>
+      `<tr><td class="row-num">${startIdx + i + 1}</td>` +
+      row.map((cell, j) => {
+        const t = types[j];
+        let cls = '';
+        let display = escHtml(String(cell));
+        if (t === 'integer' || t === 'float') cls = 'cell-num';
+        if (t === 'date') cls = 'cell-date';
+        if (t === 'boolean') display = cell === 'Sí'
+          ? '<span class="bool-yes">✓ Sí</span>'
+          : (cell === 'No' ? '<span class="bool-no">✗ No</span>' : escHtml(String(cell)));
+        const colNameEsc = data.columns[j].replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        return `<td class="${cls}" ondblclick="editCell(this, ${startIdx + i}, '${colNameEsc}', '${t}')" title="Doble clic para editar">${display}</td>`;
+      }).join('') +
+      '</tr>'
+    ).join('');
+  }
+
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('excelTable').style.display = 'table';
+
+  const start = startIdx + 1;
+  const end = Math.min(startIdx + data.per_page, data.total_rows);
+  document.getElementById('rowInfo').textContent =
+    `Mostrando ${start}–${end} de ${data.total_rows.toLocaleString()} filas`;
+
+  renderPag(data.page, data.total_pages, data.total_rows);
+}
+
+function editCell(td, rowIndex, colName, colType) {
+  if (td.querySelector('.edit-input')) return; // already editing
+  
+  // Store original value on the element
+  if (!td.hasAttribute('data-original')) {
+    td.setAttribute('data-original', td.innerHTML);
+  }
+  
+  const currentText = td.innerText.trim().replace(/^✓ |^✗ /, ''); // strip boolean icons if any
+  
+  let inputHtml = '';
+  if (colType === 'boolean') {
+    const isYes = currentText === 'Sí';
+    inputHtml = `<select class="edit-input" style="width:100%; color:var(--text, #fff); background:var(--input-bg, #0d0d0d); border:1px solid var(--border, #333); border-radius:4px; padding:2px;">
+      <option value="Sí" ${isYes ? 'selected' : ''}>Sí</option>
+      <option value="No" ${!isYes ? 'selected' : ''}>No</option>
+    </select>`;
+  } else {
+    inputHtml = `<input type="text" class="edit-input" value="${escHtml(currentText)}" style="width:100%; box-sizing:border-box; padding:4px 6px; color:var(--text, #fff); background:var(--input-bg, #0d0d0d); border:1px solid var(--border, #333); border-radius:4px;">`;
+  }
+  
+  td.innerHTML = inputHtml;
+  const input = td.querySelector('.edit-input');
+  input.focus();
+  if(input.tagName === 'INPUT') {
+      input.setSelectionRange(input.value.length, input.value.length);
+  }
+  
+  // Attach events dynamically
+  input.addEventListener('blur', () => saveCell(input, rowIndex, colName, colType));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();
+    } else if (e.key === 'Escape') {
+        td.innerHTML = td.getAttribute('data-original');
+        td.removeAttribute('data-original');
+    }
+  });
+}
+
+async function saveCell(input, rowIndex, colName, colType) {
+  const td = input.parentElement;
+  const newValue = input.value;
+  
+  td.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:var(--text-muted,#888)"></i>';
+  
+  try {
+    const r = await fetch(`/api/edit-cell/${FILE_ID}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sheet_name: currentSheet,
+        row_index: rowIndex,
+        col_name: colName,
+        col_type: colType,
+        value: newValue
+      })
+    });
+    
+    const data = await r.json();
+    if (data.error) {
+      alert('Error: ' + data.error);
+      td.innerHTML = td.getAttribute('data-original'); // revert
+    } else {
+      let display = data.formatted;
+      if (colType === 'boolean') {
+        display = display === 'Sí' ? '<span class="bool-yes">✓ Sí</span>' : (display === 'No' ? '<span class="bool-no">✗ No</span>' : escHtml(display));
+      } else {
+        display = escHtml(display);
+      }
+      td.innerHTML = display;
+      td.removeAttribute('data-original');
+    }
+  } catch (err) {
+    alert('Error al guardar: ' + err);
+    td.innerHTML = td.getAttribute('data-original'); // revert
+  }
+}
+
+</script>
+{% endblock %}
+

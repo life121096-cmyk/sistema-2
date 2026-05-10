@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Subir Archivos · Insalud{% endblock %}
+{% block page_title %}Subir Archivos{% endblock %}
+
+{% block content %}
+<div class="upload-page">
+  <div class="upload-header">
+    <h2>Cargar archivos Excel</h2>
+    <p>Soporta formatos <strong>XLSX</strong>, <strong>XLS</strong> y <strong>CSV</strong> · Máximo 50 MB por archivo</p>
+  </div>
+
+  <form action="{{ url_for('upload') }}" method="POST" enctype="multipart/form-data" id="uploadForm">
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="dropZone">
+      <div class="drop-zone-inner">
+        <div class="drop-icon">
+          <i class="fas fa-cloud-arrow-up"></i>
+        </div>
+        <h3>Arrastra y suelta tus archivos aquí</h3>
+        <p>o haz clic para seleccionar</p>
+        <label for="fileInput" class="btn-select-files">
+          <i class="fas fa-folder-open"></i> Seleccionar archivos
+        </label>
+        <input type="file" id="fileInput" name="files" accept=".xlsx,.xls,.csv"
+               multiple style="display:none" onchange="handleFileSelect(this)">
+        <div class="drop-formats">
+          <span class="format-badge">XLSX</span>
+          <span class="format-badge">XLS</span>
+          <span class="format-badge">CSV</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- File Preview List -->
+    <div class="file-preview-list" id="filePreviewList" style="display:none">
+      <div class="preview-header">
+        <h3><i class="fas fa-list-check"></i> Archivos seleccionados</h3>
+        <button type="button" onclick="clearFiles()" class="btn-clear">
+          <i class="fas fa-trash"></i> Limpiar
+        </button>
+      </div>
+      <div id="previewItems"></div>
+      <div class="upload-actions">
+        <button type="submit" class="btn-primary btn-lg" id="submitBtn">
+          <i class="fas fa-cloud-arrow-up"></i>
+          <span>Subir archivos</span>
+          <div class="btn-spinner" style="display:none">
+            <i class="fas fa-circle-notch fa-spin"></i>
+          </div>
+        </button>
+        <a href="{{ url_for('files') }}" class="btn-secondary btn-lg">
+          <i class="fas fa-xmark"></i> Cancelar
+        </a>
+      </div>
+    </div>
+  </form>
+
+  <!-- Upload progress bar (shown on submit) -->
+  <div class="upload-progress" id="uploadProgress" style="display:none">
+    <div class="progress-header">
+      <span><i class="fas fa-circle-notch fa-spin"></i> Procesando archivos...</span>
+      <span id="progressPct">0%</span>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+  </div>
+
+  <!-- Tips -->
+  <div class="upload-tips">
+    <h4><i class="fas fa-lightbulb"></i> Consejos</h4>
+    <ul>
+      <li>Puedes subir <strong>múltiples archivos</strong> a la vez.</li>
+      <li>Los archivos con <strong>varias hojas</strong> son soportados completamente.</li>
+      <li>Se preserva el nombre original del archivo.</li>
+      <li>Puedes ver los datos <strong>sin descargar</strong> el archivo.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+let selectedFiles = [];
+
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const files = Array.from(e.dataTransfer.files).filter(f => isValidFile(f));
+  addFiles(files);
+});
+dropZone.addEventListener('click', e => {
+  if (e.target.tagName !== 'LABEL' && e.target.tagName !== 'INPUT')
+    fileInput.click();
+});
+
+function isValidFile(f) {
+  return /\.(xlsx|xls|csv)$/i.test(f.name);
+}
+
+function handleFileSelect(input) {
+  const files = Array.from(input.files).filter(f => isValidFile(f));
+  addFiles(files);
+}
+
+function addFiles(files) {
+  files.forEach(f => {
+    if (!selectedFiles.find(sf => sf.name === f.name && sf.size === f.size))
+      selectedFiles.push(f);
+  });
+  renderPreview();
+}
+
+function renderPreview() {
+  const list = document.getElementById('filePreviewList');
+  const items = document.getElementById('previewItems');
+  if (!selectedFiles.length) { list.style.display = 'none'; return; }
+  list.style.display = 'block';
+
+  const dt = new DataTransfer();
+  selectedFiles.forEach(f => dt.items.add(f));
+  fileInput.files = dt.files;
+
+  items.innerHTML = selectedFiles.map((f, i) => `
+    <div class="preview-item" id="pi-${i}">
+      <div class="pi-icon ${getExt(f.name)}-icon">
+        <i class="fas fa-file-excel"></i>
+      </div>
+      <div class="pi-info">
+        <div class="pi-name">${escHtml(f.name)}</div>
+        <div class="pi-size">${fmtSize(f.size)}</div>
+      </div>
+      <button type="button" onclick="removeFile(${i})" class="pi-remove">
+        <i class="fas fa-xmark"></i>
+      </button>
+    </div>
+  `).join('');
+}
+
+function getExt(name) { return name.split('.').pop().toLowerCase(); }
+function fmtSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1048576).toFixed(2) + ' MB';
+}
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function removeFile(i) {
+  selectedFiles.splice(i, 1);
+  renderPreview();
+}
+function clearFiles() { selectedFiles = []; renderPreview(); }
+
+document.getElementById('uploadForm').addEventListener('submit', function() {
+  if (!selectedFiles.length) return;
+  document.getElementById('submitBtn').disabled = true;
+  document.querySelector('.btn-spinner').style.display = 'inline-flex';
+  document.querySelector('#submitBtn span').style.display = 'none';
+});
+</script>
+{% endblock %}

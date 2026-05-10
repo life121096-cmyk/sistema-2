@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+{% block title %}Jefes de ASIC · Insalud{% endblock %}
+{% block page_title %}Jefes de ASIC{% endblock %}
+
+{% block content %}
+<style>
+.gadd-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:1.4rem;margin-bottom:1.1rem}
+.gadd-card h4{margin:0 0 1rem;font-size:.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:.06em}
+.gadd-row{display:flex;gap:.7rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:.7rem}
+.gadd-row .fg{flex:1;min-width:200px}
+.gadd-row label{display:block;font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:.35rem}
+.gadd-row input,.gadd-row select{width:100%;padding:.58rem .9rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;box-sizing:border-box}
+.gadd-row input:focus,.gadd-row select:focus{outline:none;border-color:var(--accent)}
+.btn-gadd{padding:.6rem 1.2rem;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:.45rem;font-size:.88rem;margin-top:1rem}
+.btn-gadd:hover{opacity:.88}
+.glist-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.glist-head{padding:.9rem 1.4rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.glist-head h4{margin:0;font-size:.9rem}
+.gcnt{background:var(--accent-light,#1e40af22);color:var(--accent);padding:.2rem .7rem;border-radius:20px;font-size:.78rem;font-weight:700}
+.gitem{display:flex;align-items:center;justify-content:space-between;padding:.7rem 1.4rem;border-bottom:1px solid var(--border);transition:background .15s}
+.gitem:last-child{border-bottom:none}
+.gitem:hover{background:var(--bg3)}
+.gitem-left{display:flex;flex-direction:column;gap:.15rem}
+.gitem-name{font-weight:500;font-size:.9rem;color:var(--text)}
+.gitem-sub{font-size:.78rem;color:var(--text2)}
+.gitem-actions{display:flex;gap:.4rem}
+.btn-gdel,.btn-gedit{background:none;border:1px solid transparent;color:var(--text2);cursor:pointer;padding:.3rem .55rem;border-radius:6px;font-size:.8rem;transition:all .15s}
+.btn-gdel:hover{background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.3)}
+.btn-gedit:hover{background:rgba(2,132,199,.1);color:var(--accent);border-color:rgba(2,132,199,.3)}
+.btn-gcancel{padding:.6rem 1.2rem;background:transparent;color:var(--text2);border:1px solid var(--border);border-radius:8px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:.45rem;font-size:.88rem;transition:all .15s}
+.btn-gcancel:hover{background:var(--bg3)}
+.geo-empty{padding:2.5rem;text-align:center;color:var(--text2);font-size:.9rem}
+.geo-search{padding:.55rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;width:200px}
+.geo-search:focus{outline:none;border-color:var(--accent)}
+
+/* Modal Styles */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.modal-box { background: var(--bg2); width: 450px; max-width: 90%; border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; animation: modalFadeIn 0.2s ease; }
+@keyframes modalFadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+.modal-header { padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg); }
+.modal-header h3 { margin: 0; font-size: 1.1rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem; }
+.modal-close { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--text2); transition: color 0.15s; }
+.modal-close:hover { color: var(--red); }
+.modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 0.8rem; }
+.m-row { display: flex; justify-content: space-between; font-size: 0.95rem; border-bottom: 1px dashed var(--border); padding-bottom: 0.5rem; }
+.m-row strong { color: var(--text2); }
+.m-row span { color: var(--text); font-weight: 500; text-align: right; max-width: 60%; word-break: break-word; }
+.gitem-clickable { cursor: pointer; }
+</style>
+
+<div class="gadd-card">
+  <h4><i class="fas fa-user-plus"></i> Registrar Jefe de ASIC</h4>
+  
+  <div class="gadd-row">
+    <div class="fg">
+      <label>Nombre</label>
+      <input type="text" id="inp-nombre" placeholder="Ej: Juan">
+    </div>
+    <div class="fg">
+      <label>Apellido</label>
+      <input type="text" id="inp-apellido" placeholder="Ej: Pérez">
+    </div>
+    <div class="fg">
+      <label>Teléfono</label>
+      <input type="text" id="inp-telefono" placeholder="Ej: 0414-1234567">
+    </div>
+    <div class="fg">
+      <label>CDI donde trabaja</label>
+      <input type="text" id="inp-cdi" placeholder="Ej: CDI San José">
+    </div>
+  </div>
+
+  <div class="gadd-row">
+    <div class="fg">
+      <label>Estado</label>
+      <select id="sel-estado" onchange="loadSelMun()">
+        <option value="">-- Seleccione estado --</option>
+        {% for e in estados %}
+        <option value="{{ e.id }}">{{ e.nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="fg">
+      <label>Municipio</label>
+      <select id="sel-municipio" onchange="loadSelParr()">
+        <option value="">-- Seleccione municipio --</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>Parroquia</label>
+      <select id="sel-parroquia" onchange="loadSelAsic()">
+        <option value="">-- Seleccione parroquia --</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label>ASIC</label>
+      <select id="sel-asic">
+        <option value="">-- Seleccione ASIC --</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="form-btns" style="display:flex;gap:10px;margin-top:1rem">
+    <button class="btn-gadd" onclick="addJefe()"><i class="fas fa-save"></i> Guardar Registro</button>
+  </div>
+</div>
+
+<div class="glist-card">
+  <div class="glist-head">
+    <h4>Lista de Jefes de ASIC</h4>
+    <div style="display:flex;gap:.6rem;align-items:center">
+      <input type="text" id="inp-search-jefes" class="geo-search" placeholder="Buscar por nombre, ASIC..." oninput="renderJefes()">
+      <span class="gcnt" id="lbl-cnt-jefes">{{ total_jefes }}</span>
+    </div>
+  </div>
+  <div id="list-jefes">
+    <div class="geo-empty"><i class="fas fa-circle-notch fa-spin"></i> Cargando...</div>
+  </div>
+</div>
+
+<!-- Modal para Detalles -->
+<div class="modal-overlay" id="jefe-modal" style="display:none;" onclick="closeJefeModal(event)">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h3><i class="fas fa-id-card" style="color:var(--accent)"></i> Detalles del Jefe de ASIC</h3>
+      <button class="modal-close" onclick="closeJefeModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="m-row"><strong>Nombre:</strong> <span id="m-jefe-nombre"></span></div>
+      <div class="m-row"><strong>Apellido:</strong> <span id="m-jefe-apellido"></span></div>
+      <div class="m-row"><strong>Teléfono:</strong> <span id="m-jefe-telefono"></span></div>
+      <div class="m-row"><strong>CDI:</strong> <span id="m-jefe-cdi"></span></div>
+      <div class="m-row"><strong>Estado:</strong> <span id="m-jefe-estado"></span></div>
+      <div class="m-row"><strong>Municipio:</strong> <span id="m-jefe-municipio"></span></div>
+      <div class="m-row"><strong>Parroquia:</strong> <span id="m-jefe-parroquia"></span></div>
+      <div class="m-row"><strong>ASIC:</strong> <span id="m-jefe-asic"></span></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  loadJefes();
+});
+
+async function apiGet(url) {
+  const r = await fetch(url);
+  return r.json();
+}
+
+async function apiPost(url, body) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+async function apiPut(url, body) {
+  const r = await fetch(url, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  return r.json();
+}
+
+async function apiDel(url) {
+  const r = await fetch(url, { method: 'DELETE' });
+  return r.json();
+}
+
+async function loadSelMun() {
+  const estId = document.getElementById('sel-estado').value;
+  const selMun = document.getElementById('sel-municipio');
+  const selParr = document.getElementById('sel-parroquia');
+  const selAsic = document.getElementById('sel-asic');
+  
+  selMun.innerHTML = '<option value="">-- Seleccione municipio --</option>';
+  selParr.innerHTML = '<option value="">-- Seleccione parroquia --</option>';
+  selAsic.innerHTML = '<option value="">-- Seleccione ASIC --</option>';
+  
+  if (!estId) return;
+  const data = await apiGet('/api/geo/municipios?estado_id=' + estId);
+  data.forEach(m => {
+    const o = document.createElement('option');
+    o.value = m.id;
+    o.textContent = m.nombre;
+    selMun.appendChild(o);
+  });
+}
+
+async function loadSelParr() {
+  const munId = document.getElementById('sel-municipio').value;
+  const selParr = document.getElementById('sel-parroquia');
+  const selAsic = document.getElementById('sel-asic');
+  
+  selParr.innerHTML = '<option value="">-- Seleccione parroquia --</option>';
+  selAsic.innerHTML = '<option value="">-- Seleccione ASIC --</option>';
+  
+  if (!munId) return;
+  const data = await apiGet('/api/geo/parroquias?municipio_id=' + munId);
+  data.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id;
+    o.textContent = p.nombre;
+    selParr.appendChild(o);
+  });
+}
+
+async function loadSelAsic() {
+  const parrId = document.getElementById('sel-parroquia').value;
+  const selAsic = document.getElementById('sel-asic');
+  
+  selAsic.innerHTML = '<option value="">-- Seleccione ASIC --</option>';
+  
+  if (!parrId) return;
+  const data = await apiGet('/api/geo/asics?parroquia_id=' + parrId);
+  data.forEach(a => {
+    const o = document.createElement('option');
+    o.value = a.id;
+    o.textContent = a.nombre;
+    selAsic.appendChild(o);
+  });
+}
+
+let allJefes = [];
+let editingJefeId = null;
+
+async function loadJefes() {
+  allJefes = await apiGet('/api/jefes');
+  renderJefes();
+}
+
+function renderJefes() {
+  const query = (document.getElementById('inp-search-jefes')?.value || '').toLowerCase();
+  
+  const filtered = allJefes.filter(j => {
+    const searchString = `${j.nombre} ${j.apellido} ${j.telefono||''} ${j.cdi} ${j.estado_nombre||''} ${j.municipio_nombre||''} ${j.parroquia_nombre||''} ${j.asic_nombre||''}`.toLowerCase();
+    return searchString.includes(query);
+  });
+
+  document.getElementById('lbl-cnt-jefes').textContent = filtered.length;
+  const el = document.getElementById('list-jefes');
+  
+  if (!filtered.length) {
+    if (allJefes.length === 0) {
+      el.innerHTML = '<div class="geo-empty">No hay Jefes de ASIC registrados aún.</div>';
+    } else {
+      el.innerHTML = '<div class="geo-empty">No se encontraron resultados para tu búsqueda.</div>';
+    }
+    return;
+  }
+  
+  el.innerHTML = filtered.map(j => `
+    <div class="gitem gitem-clickable" id="jefe-${j.id}" onclick="showJefeModal(${j.id})">
+      <div class="gitem-left">
+        <div class="gitem-name"><i class="fas fa-user-tie" style="color:var(--accent);margin-right:.5rem"></i>${j.nombre} ${j.apellido}</div>
+        <div class="gitem-sub">
+          <strong>Tel:</strong> ${j.telefono || 'No registrado'} &nbsp;|&nbsp; <strong>CDI:</strong> ${j.cdi} <br>
+          <strong>Ubicación:</strong> ${[j.estado_nombre, j.municipio_nombre, j.parroquia_nombre, j.asic_nombre].filter(Boolean).join(' › ')}
+        </div>
+      </div>
+      <div class="gitem-actions">
+        <button class="btn-gedit" onclick="event.stopPropagation(); loadEditJefe(${j.id})" title="Editar"><i class="fas fa-edit"></i> Editar</button>
+        <button class="btn-gdel" onclick="event.stopPropagation(); delJefe(${j.id})" title="Eliminar"><i class="fas fa-trash"></i> Eliminar</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function showJefeModal(id) {
+  const j = allJefes.find(x => x.id === id);
+  if (!j) return;
+  
+  document.getElementById('m-jefe-nombre').textContent = j.nombre;
+  document.getElementById('m-jefe-apellido').textContent = j.apellido;
+  document.getElementById('m-jefe-telefono').textContent = j.telefono || 'No registrado';
+  document.getElementById('m-jefe-cdi').textContent = j.cdi;
+  document.getElementById('m-jefe-estado').textContent = j.estado_nombre || '-';
+  document.getElementById('m-jefe-municipio').textContent = j.municipio_nombre || '-';
+  document.getElementById('m-jefe-parroquia').textContent = j.parroquia_nombre || '-';
+  document.getElementById('m-jefe-asic').textContent = j.asic_nombre || '-';
+  
+  document.getElementById('jefe-modal').style.display = 'flex';
+}
+
+function closeJefeModal(e) {
+  if (e && e.target.id !== 'jefe-modal') return;
+  document.getElementById('jefe-modal').style.display = 'none';
+}
+
+async function addJefe() {
+  const nombre = document.getElementById('inp-nombre').value.trim();
+  const apellido = document.getElementById('inp-apellido').value.trim();
+  const telefono = document.getElementById('inp-telefono').value.trim();
+  const cdi = document.getElementById('inp-cdi').value.trim();
+  const estado_id = document.getElementById('sel-estado').value || null;
+  const municipio_id = document.getElementById('sel-municipio').value || null;
+  const parroquia_id = document.getElementById('sel-parroquia').value || null;
+  const asic_id = document.getElementById('sel-asic').value || null;
+
+  if (!nombre || !apellido || !cdi) {
+    alert('Nombre, Apellido y CDI son campos obligatorios.');
+    return;
+  }
+
+  const btn = document.querySelector('.btn-gadd');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+  const url = editingJefeId ? '/api/jefes/' + editingJefeId : '/api/jefes';
+  const method = editingJefeId ? apiPut : apiPost;
+
+  const res = await method(url, {
+    nombre, apellido, telefono, cdi, estado_id, municipio_id, parroquia_id, asic_id
+  });
+
+  btn.disabled = false;
+  btn.innerHTML = editingJefeId ? '<i class="fas fa-save"></i> Actualizar Registro' : '<i class="fas fa-save"></i> Guardar Registro';
+
+  if (res.error) {
+    alert(res.error);
+    return;
+  }
+
+  cancelEdit();
+  await loadJefes();
+}
+
+async function loadEditJefe(id) {
+  const j = allJefes.find(x => x.id === id);
+  if (!j) return;
+  editingJefeId = j.id;
+
+  document.getElementById('inp-nombre').value = j.nombre;
+  document.getElementById('inp-apellido').value = j.apellido;
+  document.getElementById('inp-telefono').value = j.telefono || '';
+  document.getElementById('inp-cdi').value = j.cdi;
+
+  document.querySelector('.gadd-card h4').innerHTML = '<i class="fas fa-user-edit"></i> Editar Jefe de ASIC';
+  
+  if (j.estado_id) {
+    document.getElementById('sel-estado').value = j.estado_id;
+    await loadSelMun();
+    if (j.municipio_id) {
+      document.getElementById('sel-municipio').value = j.municipio_id;
+      await loadSelParr();
+      if (j.parroquia_id) {
+        document.getElementById('sel-parroquia').value = j.parroquia_id;
+        await loadSelAsic();
+        if (j.asic_id) {
+          document.getElementById('sel-asic').value = j.asic_id;
+        }
+      }
+    }
+  } else {
+    document.getElementById('sel-estado').value = '';
+    document.getElementById('sel-municipio').innerHTML = '<option value="">-- Seleccione municipio --</option>';
+    document.getElementById('sel-parroquia').innerHTML = '<option value="">-- Seleccione parroquia --</option>';
+    document.getElementById('sel-asic').innerHTML = '<option value="">-- Seleccione ASIC --</option>';
+  }
+
+  const btnGrp = document.getElementById('form-btns');
+  btnGrp.innerHTML = `
+    <button class="btn-gadd" style="margin-top:0" onclick="addJefe()"><i class="fas fa-save"></i> Actualizar Registro</button>
+    <button class="btn-gcancel" style="margin-top:0" onclick="cancelEdit()"><i class="fas fa-times"></i> Cancelar</button>
+  `;
+  window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function cancelEdit() {
+  editingJefeId = null;
+  document.getElementById('inp-nombre').value = '';
+  document.getElementById('inp-apellido').value = '';
+  document.getElementById('inp-telefono').value = '';
+  document.getElementById('inp-cdi').value = '';
+  document.getElementById('sel-estado').value = '';
+  document.getElementById('sel-municipio').innerHTML = '<option value="">-- Seleccione municipio --</option>';
+  document.getElementById('sel-parroquia').innerHTML = '<option value="">-- Seleccione parroquia --</option>';
+  document.getElementById('sel-asic').innerHTML = '<option value="">-- Seleccione ASIC --</option>';
+
+  document.querySelector('.gadd-card h4').innerHTML = '<i class="fas fa-user-plus"></i> Registrar Jefe de ASIC';
+  document.getElementById('form-btns').innerHTML = `
+    <button class="btn-gadd" style="margin-top:0" onclick="addJefe()"><i class="fas fa-save"></i> Guardar Registro</button>
+  `;
+}
+
+async function delJefe(id) {
+  if (!confirm('¿Eliminar este Jefe de ASIC?')) return;
+  await apiDel('/api/jefes/' + id);
+  await loadJefes();
+}
+</script>
+{% endblock %}

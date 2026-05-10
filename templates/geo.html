@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+{% block title %}Catálogo Geográfico · Insalud{% endblock %}
+{% block page_title %}Catálogo Geográfico{% endblock %}
+
+{% block content %}
+<style>
+.geo-pills{display:flex;gap:.9rem;margin-bottom:1.75rem;flex-wrap:wrap}
+.geo-pill{display:flex;align-items:center;gap:.75rem;background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:.85rem 1.4rem}
+.geo-pill-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem}
+.gp-blue .geo-pill-icon{background:#3b82f620;color:#3b82f6}
+.gp-green .geo-pill-icon{background:#22c55e20;color:#22c55e}
+.gp-purple .geo-pill-icon{background:#a855f720;color:#a855f7}
+.gp-orange .geo-pill-icon{background:#f9731620;color:#f97316}
+.geo-pill-val{font-size:1.4rem;font-weight:800;line-height:1}
+.geo-pill-lbl{font-size:.75rem;color:var(--text2)}
+.geo-tabs{display:flex;gap:.5rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.gtab{padding:.55rem 1.2rem;border-radius:8px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;font-weight:600;font-size:.85rem;transition:all .18s}
+.gtab.active,.gtab:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.gpanel{display:none}.gpanel.active{display:block}
+.gadd-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:1.4rem;margin-bottom:1.1rem}
+.gadd-card h4{margin:0 0 1rem;font-size:.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:.06em}
+.gadd-row{display:flex;gap:.7rem;flex-wrap:wrap;align-items:flex-end}
+.gadd-row .fg{flex:1;min-width:150px}
+.gadd-row label{display:block;font-size:.78rem;font-weight:600;color:var(--text2);margin-bottom:.35rem}
+.gadd-row input,.gadd-row select{width:100%;padding:.58rem .9rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.88rem;box-sizing:border-box}
+.gadd-row input:focus,.gadd-row select:focus{outline:none;border-color:var(--accent)}
+.btn-gadd{padding:.6rem 1.2rem;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:.45rem;font-size:.88rem}
+.btn-gadd:hover{opacity:.88}
+.glist-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+.glist-head{padding:.9rem 1.4rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.glist-head h4{margin:0;font-size:.9rem}
+.gcnt{background:rgba(79,142,247,.15);color:var(--accent);padding:.2rem .7rem;border-radius:20px;font-size:.78rem;font-weight:700}
+.gitem{display:flex;align-items:center;justify-content:space-between;padding:.7rem 1.4rem;border-bottom:1px solid var(--border);transition:background .15s}
+.gitem:last-child{border-bottom:none}
+.gitem:hover{background:var(--bg3)}
+.gitem-left{display:flex;flex-direction:column;gap:.15rem}
+.gitem-name{font-weight:500;font-size:.9rem}
+.gitem-sub{font-size:.78rem;color:var(--text2)}
+.btn-gdel{background:none;border:1px solid transparent;color:var(--text2);cursor:pointer;padding:.3rem .55rem;border-radius:6px;font-size:.8rem;transition:all .15s}
+.btn-gdel:hover{background:rgba(239,68,68,.1);color:var(--red);border-color:rgba(239,68,68,.3)}
+.geo-empty{padding:2.5rem;text-align:center;color:var(--text2);font-size:.9rem}
+.geo-search{padding:.55rem 1rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:.85rem;width:200px}
+.geo-search:focus{outline:none;border-color:var(--accent)}
+</style>
+
+<!-- Contadores -->
+<div class="geo-pills">
+  <div class="geo-pill gp-blue">
+    <div class="geo-pill-icon"><i class="fas fa-map"></i></div>
+    <div><div class="geo-pill-val" id="cnt-estados">{{ estados|length }}</div><div class="geo-pill-lbl">Estados</div></div>
+  </div>
+  <div class="geo-pill gp-green">
+    <div class="geo-pill-icon"><i class="fas fa-city"></i></div>
+    <div><div class="geo-pill-val" id="cnt-mun">{{ total_mun }}</div><div class="geo-pill-lbl">Municipios</div></div>
+  </div>
+  <div class="geo-pill gp-purple">
+    <div class="geo-pill-icon"><i class="fas fa-church"></i></div>
+    <div><div class="geo-pill-val" id="cnt-parr">{{ total_parr }}</div><div class="geo-pill-lbl">Parroquias</div></div>
+  </div>
+  <div class="geo-pill gp-orange">
+    <div class="geo-pill-icon"><i class="fas fa-hospital"></i></div>
+    <div><div class="geo-pill-val" id="cnt-asic">{{ total_asic }}</div><div class="geo-pill-lbl">ASICs</div></div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="geo-tabs">
+  <button class="gtab active" onclick="showTab('estados')"><i class="fas fa-map"></i> Estados</button>
+  <button class="gtab" onclick="showTab('municipios')"><i class="fas fa-city"></i> Municipios</button>
+  <button class="gtab" onclick="showTab('parroquias')"><i class="fas fa-church"></i> Parroquias</button>
+  <button class="gtab" onclick="showTab('asics')"><i class="fas fa-hospital"></i> ASICs</button>
+</div>
+
+<!-- ──── TAB: ESTADOS ──── -->
+<div id="tab-estados" class="gpanel active">
+  <div class="gadd-card">
+    <h4><i class="fas fa-plus"></i> Agregar Estado</h4>
+    <div class="gadd-row">
+      <div class="fg"><label>Nombre del estado</label><input id="inp-est" placeholder="Ej: Aragua" onkeydown="if(event.key==='Enter')addEstado()"></div>
+      <button class="btn-gadd" onclick="addEstado()"><i class="fas fa-plus"></i> Agregar</button>
+    </div>
+  </div>
+  <div class="glist-card">
+    <div class="glist-head"><h4>Lista de Estados</h4><span class="gcnt" id="lbl-cnt-estados">0</span></div>
+    <div id="list-estados"><div class="geo-empty"><i class="fas fa-circle-notch fa-spin"></i> Cargando...</div></div>
+  </div>
+</div>
+
+<!-- ──── TAB: MUNICIPIOS ──── -->
+<div id="tab-municipios" class="gpanel">
+  <div class="gadd-card">
+    <h4><i class="fas fa-plus"></i> Agregar Municipio</h4>
+    <div class="gadd-row">
+      <div class="fg"><label>Estado</label>
+        <select id="sel-est-mun"><option value="">-- Seleccione estado --</option></select>
+      </div>
+      <div class="fg"><label>Nombre del municipio</label><input id="inp-mun" placeholder="Ej: Girardot" onkeydown="if(event.key==='Enter')addMunicipio()"></div>
+      <button class="btn-gadd" onclick="addMunicipio()"><i class="fas fa-plus"></i> Agregar</button>
+    </div>
+  </div>
+  <div class="glist-card">
+    <div class="glist-head">
+      <h4>Lista de Municipios</h4>
+      <div style="display:flex;gap:.6rem;align-items:center">
+        <select id="fil-est-mun" class="geo-search" style="width:160px" onchange="loadMunicipios()"><option value="">Todos los estados</option></select>
+        <span class="gcnt" id="lbl-cnt-mun">0</span>
+      </div>
+    </div>
+    <div id="list-municipios"><div class="geo-empty"><i class="fas fa-circle-notch fa-spin"></i> Cargando...</div></div>
+  </div>
+</div>
+
+<!-- ──── TAB: PARROQUIAS ──── -->
+<div id="tab-parroquias" class="gpanel">
+  <div class="gadd-card">
+    <h4><i class="fas fa-plus"></i> Agregar Parroquia</h4>
+    <div class="gadd-row">
+      <div class="fg"><label>Estado</label>
+        <select id="sel-est-parr" onchange="loadSelMunParr()"><option value="">-- Seleccione estado --</option></select>
+      </div>
+      <div class="fg"><label>Municipio</label>
+        <select id="sel-mun-parr"><option value="">-- Seleccione municipio --</option></select>
+      </div>
+      <div class="fg"><label>Nombre de la parroquia</label><input id="inp-parr" placeholder="Ej: Las Delicias" onkeydown="if(event.key==='Enter')addParroquia()"></div>
+      <button class="btn-gadd" onclick="addParroquia()"><i class="fas fa-plus"></i> Agregar</button>
+    </div>
+  </div>
+  <div class="glist-card">
+    <div class="glist-head">
+      <h4>Lista de Parroquias</h4>
+      <div style="display:flex;gap:.6rem;align-items:center">
+        <select id="fil-mun-parr" class="geo-search" style="width:190px" onchange="loadParroquias()"><option value="">Todos los municipios</option></select>
+        <span class="gcnt" id="lbl-cnt-parr">0</span>
+      </div>
+    </div>
+    <div id="list-parroquias"><div class="geo-empty"><i class="fas fa-circle-notch fa-spin"></i> Cargando...</div></div>
+  </div>
+</div>
+
+<!-- ──── TAB: ASICs ──── -->
+<div id="tab-asics" class="gpanel">
+  <div class="gadd-card">
+    <h4><i class="fas fa-plus"></i> Agregar ASIC</h4>
+    <div class="gadd-row">
+      <div class="fg"><label>Estado (opcional)</label>
+        <select id="sel-est-asic" onchange="loadSelMunAsic()"><option value="">-- Sin estado --</option></select>
+      </div>
+      <div class="fg"><label>Municipio (opcional)</label>
+        <select id="sel-mun-asic" onchange="loadSelParrAsic()"><option value="">-- Sin municipio --</option></select>
+      </div>
+      <div class="fg"><label>Parroquia (opcional)</label>
+        <select id="sel-parr-asic"><option value="">-- Sin parroquia --</option></select>
+      </div>
+      <div class="fg"><label>Nombre del ASIC</label><input id="inp-asic" placeholder="Ej: ASIC Caña de Azúcar" onkeydown="if(event.key==='Enter')addAsic()"></div>
+      <button class="btn-gadd" onclick="addAsic()"><i class="fas fa-plus"></i> Agregar</button>
+    </div>
+  </div>
+  <div class="glist-card">
+    <div class="glist-head"><h4>Lista de ASICs</h4><span class="gcnt" id="lbl-cnt-asic">0</span></div>
+    <div id="list-asics"><div class="geo-empty"><i class="fas fa-circle-notch fa-spin"></i> Cargando...</div></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allEstados = [];
+
+// ─── Init ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadEstados();
+  loadMunicipios();
+  loadParroquias();
+  loadAsics();
+  populateEstadoSelects();
+});
+
+async function apiGet(url) {
+  const r = await fetch(url);
+  return r.json();
+}
+async function apiPost(url, body) {
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  return r.json();
+}
+async function apiDel(url) {
+  const r = await fetch(url, {method:'DELETE'});
+  return r.json();
+}
+
+// ─── Tabs ────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.gpanel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.gtab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.gtab').forEach(b => { if(b.textContent.toLowerCase().includes(name.slice(0,-1)||name)) b.classList.add('active'); });
+  event.currentTarget.classList.add('active');
+}
+
+// ─── Populate estado selects ─────────────────────────────
+async function populateEstadoSelects() {
+  allEstados = await apiGet('/api/geo/estados');
+  const selIds = ['sel-est-mun','sel-est-parr','sel-est-asic','fil-est-mun'];
+  selIds.forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const first = sel.options[0];
+    sel.innerHTML = '';
+    sel.appendChild(first);
+    allEstados.forEach(e => {
+      const o = document.createElement('option');
+      o.value = e.id; o.textContent = e.nombre;
+      sel.appendChild(o);
+    });
+  });
+}
+
+// ─── ESTADOS ─────────────────────────────────────────────
+async function loadEstados() {
+  const data = await apiGet('/api/geo/estados');
+  allEstados = data;
+  const cnt = data.length;
+  document.getElementById('cnt-estados').textContent = cnt;
+  document.getElementById('lbl-cnt-estados').textContent = cnt;
+  const el = document.getElementById('list-estados');
+  if (!cnt) { el.innerHTML = '<div class="geo-empty">No hay estados registrados aún.</div>'; return; }
+  el.innerHTML = data.map(e => `
+    <div class="gitem" id="est-${e.id}">
+      <div class="gitem-left">
+        <div class="gitem-name"><i class="fas fa-map" style="color:#3b82f6;margin-right:.5rem"></i>${e.nombre}</div>
+        <div class="gitem-sub">${e.mun_count||0} municipio(s)</div>
+      </div>
+      <button class="btn-gdel" onclick="delEstado(${e.id})" title="Eliminar"><i class="fas fa-trash"></i> Eliminar</button>
+    </div>`).join('');
+}
+
+async function addEstado() {
+  const inp = document.getElementById('inp-est');
+  const nombre = inp.value.trim();
+  if (!nombre) return;
+  const res = await apiPost('/api/geo/estado', {nombre});
+  if (res.error) { alert(res.error); return; }
+  inp.value = '';
+  await loadEstados();
+  await populateEstadoSelects();
+}
+
+async function delEstado(id) {
+  if (!confirm('¿Eliminar este estado? Se eliminarán todos sus municipios y parroquias.')) return;
+  await apiDel('/api/geo/estado/' + id);
+  await loadEstados();
+  await loadMunicipios();
+  await loadParroquias();
+  await populateEstadoSelects();
+}
+
+// ─── MUNICIPIOS ───────────────────────────────────────────
+async function loadMunicipios() {
+  const filtro = document.getElementById('fil-est-mun')?.value || '';
+  const url = filtro ? `/api/geo/municipios?estado_id=${filtro}` : '/api/geo/municipios';
+  const data = await apiGet(url);
+  document.getElementById('cnt-mun').textContent = data.length;
+  document.getElementById('lbl-cnt-mun').textContent = data.length;
+  const el = document.getElementById('list-municipios');
+  if (!data.length) { el.innerHTML = '<div class="geo-empty">No hay municipios para mostrar.</div>'; return; }
+  el.innerHTML = data.map(m => `
+    <div class="gitem" id="mun-${m.id}">
+      <div class="gitem-left">
+        <div class="gitem-name"><i class="fas fa-city" style="color:#22c55e;margin-right:.5rem"></i>${m.nombre}</div>
+        <div class="gitem-sub">${m.estado_nombre||''}</div>
+      </div>
+      <button class="btn-gdel" onclick="delMunicipio(${m.id})" title="Eliminar"><i class="fas fa-trash"></i> Eliminar</button>
+    </div>`).join('');
+}
+
+async function addMunicipio() {
+  const estado_id = document.getElementById('sel-est-mun').value;
+  const nombre = document.getElementById('inp-mun').value.trim();
+  if (!estado_id || !nombre) { alert('Seleccione un estado e ingrese el nombre.'); return; }
+  const res = await apiPost('/api/geo/municipio', {estado_id, nombre});
+  if (res.error) { alert(res.error); return; }
+  document.getElementById('inp-mun').value = '';
+  await loadMunicipios();
+  await loadEstados();
+  await loadSelMunParr();
+}
+
+async function delMunicipio(id) {
+  if (!confirm('¿Eliminar este municipio? Se eliminarán sus parroquias.')) return;
+  await apiDel('/api/geo/municipio/' + id);
+  await loadMunicipios();
+  await loadParroquias();
+}
+
+// ─── PARROQUIAS ───────────────────────────────────────────
+async function loadSelMunParr() {
+  const estId = document.getElementById('sel-est-parr').value;
+  const sel = document.getElementById('sel-mun-parr');
+  sel.innerHTML = '<option value="">-- Seleccione municipio --</option>';
+  if (!estId) return;
+  const data = await apiGet('/api/geo/municipios?estado_id=' + estId);
+  data.forEach(m => { const o = document.createElement('option'); o.value=m.id; o.textContent=m.nombre; sel.appendChild(o); });
+}
+
+async function loadSelMunAsic() {
+  const estId = document.getElementById('sel-est-asic').value;
+  const sel = document.getElementById('sel-mun-asic');
+  sel.innerHTML = '<option value="">-- Sin municipio --</option>';
+  document.getElementById('sel-parr-asic').innerHTML = '<option value="">-- Sin parroquia --</option>';
+  if (!estId) return;
+  const data = await apiGet('/api/geo/municipios?estado_id=' + estId);
+  data.forEach(m => { const o = document.createElement('option'); o.value=m.id; o.textContent=m.nombre; sel.appendChild(o); });
+}
+
+async function loadSelParrAsic() {
+  const munId = document.getElementById('sel-mun-asic').value;
+  const sel = document.getElementById('sel-parr-asic');
+  sel.innerHTML = '<option value="">-- Sin parroquia --</option>';
+  if (!munId) return;
+  const data = await apiGet('/api/geo/parroquias?municipio_id=' + munId);
+  data.forEach(p => { const o = document.createElement('option'); o.value=p.id; o.textContent=p.nombre; sel.appendChild(o); });
+}
+
+async function loadParroquias() {
+  const filtro = document.getElementById('fil-mun-parr')?.value || '';
+  // Populate filter
+  const filSel = document.getElementById('fil-mun-parr');
+  if (filSel && filSel.options.length <= 1) {
+    const muns = await apiGet('/api/geo/municipios');
+    muns.forEach(m => { const o=document.createElement('option'); o.value=m.id; o.textContent=`${m.estado_nombre} › ${m.nombre}`; filSel.appendChild(o); });
+  }
+  const url = filtro ? `/api/geo/parroquias?municipio_id=${filtro}` : '/api/geo/parroquias';
+  const data = await apiGet(url);
+  document.getElementById('cnt-parr').textContent = data.length;
+  document.getElementById('lbl-cnt-parr').textContent = data.length;
+  const el = document.getElementById('list-parroquias');
+  if (!data.length) { el.innerHTML = '<div class="geo-empty">No hay parroquias para mostrar.</div>'; return; }
+  el.innerHTML = data.map(p => `
+    <div class="gitem" id="parr-${p.id}">
+      <div class="gitem-left">
+        <div class="gitem-name"><i class="fas fa-church" style="color:#a855f7;margin-right:.5rem"></i>${p.nombre}</div>
+        <div class="gitem-sub">${p.municipio_nombre||''}</div>
+      </div>
+      <button class="btn-gdel" onclick="delParroquia(${p.id})" title="Eliminar"><i class="fas fa-trash"></i> Eliminar</button>
+    </div>`).join('');
+}
+
+async function addParroquia() {
+  const municipio_id = document.getElementById('sel-mun-parr').value;
+  const nombre = document.getElementById('inp-parr').value.trim();
+  if (!municipio_id || !nombre) { alert('Seleccione un municipio e ingrese el nombre.'); return; }
+  const res = await apiPost('/api/geo/parroquia', {municipio_id, nombre});
+  if (res.error) { alert(res.error); return; }
+  document.getElementById('inp-parr').value = '';
+  await loadParroquias();
+}
+
+async function delParroquia(id) {
+  if (!confirm('¿Eliminar esta parroquia?')) return;
+  await apiDel('/api/geo/parroquia/' + id);
+  await loadParroquias();
+}
+
+// ─── ASICs ────────────────────────────────────────────────
+async function loadAsics() {
+  const data = await apiGet('/api/geo/asics');
+  document.getElementById('cnt-asic').textContent = data.length;
+  document.getElementById('lbl-cnt-asic').textContent = data.length;
+  const el = document.getElementById('list-asics');
+  if (!data.length) { el.innerHTML = '<div class="geo-empty">No hay ASICs registradas aún.</div>'; return; }
+  el.innerHTML = data.map(a => `
+    <div class="gitem" id="asic-${a.id}">
+      <div class="gitem-left">
+        <div class="gitem-name"><i class="fas fa-hospital" style="color:#f97316;margin-right:.5rem"></i>${a.nombre}</div>
+        <div class="gitem-sub">${[a.estado_nombre, a.municipio_nombre, a.parroquia_nombre].filter(Boolean).join(' › ')}</div>
+      </div>
+      <button class="btn-gdel" onclick="delAsic(${a.id})" title="Eliminar"><i class="fas fa-trash"></i> Eliminar</button>
+    </div>`).join('');
+}
+
+async function addAsic() {
+  const nombre = document.getElementById('inp-asic').value.trim();
+  const parroquia_id = document.getElementById('sel-parr-asic').value || null;
+  if (!nombre) { alert('Ingrese el nombre del ASIC.'); return; }
+  const res = await apiPost('/api/geo/asic', {nombre, parroquia_id});
+  if (res.error) { alert(res.error); return; }
+  document.getElementById('inp-asic').value = '';
+  await loadAsics();
+}
+
+async function delAsic(id) {
+  if (!confirm('¿Eliminar este ASIC?')) return;
+  await apiDel('/api/geo/asic/' + id);
+  await loadAsics();
+}
+
+// populate estado selects on asic tab
+document.addEventListener('DOMContentLoaded', () => {
+  ['sel-est-asic','sel-est-parr'].forEach(id => {
+    const sel = document.getElementById(id);
+    allEstados.forEach(e => { const o=document.createElement('option'); o.value=e.id; o.textContent=e.nombre; sel?.appendChild(o); });
+  });
+});
+</script>
+{% endblock %}

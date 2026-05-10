@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Insalud{% endblock %}</title>
+  <meta name="description" content="Gestiona, visualiza y descarga tus archivos Excel desde un solo lugar.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <div class="brand-icon">
+      <i class="fas fa-table-cells"></i>
+    </div>
+    <div class="brand-text">
+      <span class="brand-name">Insalud</span>
+      <span class="brand-sub">v2.0</span>
+    </div>
+    <button class="sidebar-close-mobile" onclick="toggleSidebar()" aria-label="Cerrar menú"><i class="fas fa-times"></i></button>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="{{ url_for('index') }}" class="nav-item {% if request.endpoint == 'index' %}active{% endif %}">
+      <i class="fas fa-gauge-high"></i>
+      <span>Dashboard</span>
+    </a>
+    <a href="{{ url_for('upload') }}" class="nav-item {% if request.endpoint == 'upload' %}active{% endif %}">
+      <i class="fas fa-cloud-arrow-up"></i>
+      <span>Subir Archivos</span>
+    </a>
+    <a href="{{ url_for('files') }}" class="nav-item {% if request.endpoint == 'files' %}active{% endif %}">
+      <i class="fas fa-folder-open"></i>
+      <span>Mis Archivos</span>
+    </a>
+    <a href="{{ url_for('geo') }}" class="nav-item {% if request.endpoint == 'geo' %}active{% endif %}">
+      <i class="fas fa-map-location-dot"></i>
+      <span>Catálogo Geo</span>
+    </a>
+    <a href="{{ url_for('jefes_page') }}" class="nav-item {% if request.endpoint == 'jefes_page' %}active{% endif %}">
+      <i class="fas fa-users-gear"></i>
+      <span>Jefes de ASIC</span>
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="footer-info">
+      <i class="fas fa-database"></i>
+      <span>MySQL · XAMPP</span>
+    </div>
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<div class="main-wrapper">
+  <header class="topbar">
+    <button class="topbar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
+      <i class="fas fa-bars"></i>
+    </button>
+    <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
+    
+    <div class="topbar-logos" style="display:flex; gap: 1rem; margin-left: auto; margin-right: 1.5rem; align-items: center; background: white; padding: 4px 12px; border-radius: var(--radius-sm);">
+      <img src="{{ url_for('static', filename='img/logo_insalud.png') }}" alt="Gobernación de Carabobo - Insalud" style="height: 38px; object-fit: contain;">
+      <div style="width: 1px; height: 30px; background: #e5e7eb;"></div>
+      <img src="{{ url_for('static', filename='img/logo_barrio_adentro.png') }}" alt="Misión Barrio Adentro" style="height: 38px; object-fit: contain;">
+    </div>
+
+    <div class="topbar-actions">
+      <a href="{{ url_for('upload') }}" class="btn-upload-quick">
+        <i class="fas fa-plus"></i> Subir
+      </a>
+    </div>
+  </header>
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-container">
+        {% for category, message in messages %}
+          <div class="flash flash-{{ category }}">
+            <i class="fas {% if category == 'success' %}fa-circle-check{% else %}fa-triangle-exclamation{% endif %}"></i>
+            <span>{{ message }}</span>
+            <button onclick="this.parentElement.remove()" class="flash-close">
+              <i class="fas fa-xmark"></i>
+            </button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
